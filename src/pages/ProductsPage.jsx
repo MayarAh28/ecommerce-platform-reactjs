@@ -1,58 +1,114 @@
 import { useState, useEffect } from "react";
-import { getCategories } from "../features/products/services/productService";
+import {
+  getCategories,
+  filterProducts,
+} from "../features/products/services/productService";
 import ProductCard from "../features/products/components/ProductCard";
-import { filterProducts } from "../features/products/services/productService";
+import { useSearchParams } from "react-router";
+
+const PRODUCTS_PER_PAGE = 8;
+
+const DEFAULTS = {
+  search: "",
+  category: "",
+  sortBy: "title",
+  sortOrder: "asc",
+  page: "1",
+};
+
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Basic state — not wired to filterProducts yet (student task)
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [sortBy, setSortBy] = useState("title");
-  const [sortOrder, setSortOrder] = useState("asc");
-  const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const productsPerPage = 8;
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const search = searchParams.get("search") ?? DEFAULTS.search;
+  const selectedCategory = searchParams.get("category") ?? DEFAULTS.category;
+  const sortBy = searchParams.get("sortBy") ?? DEFAULTS.sortBy;
+  const sortOrder = searchParams.get("sortOrder") ?? DEFAULTS.sortOrder;
+
+  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
+  function updateParams(updates, { replace = false } = {}) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (
+            value == null ||
+            value === "" ||
+            String(value) === DEFAULTS[key]
+          ) {
+            next.delete(key); 
+          } else {
+            next.set(key, value);
+          }
+        });
+        return next;
+      },
+      { replace }
+    );
+  }
 
   useEffect(() => {
-    async function loadCategories() {
-      const cats = await getCategories();
-      setCategories(cats);
-    }
-    loadCategories();
+    getCategories().then(setCategories);
   }, []);
 
   useEffect(() => {
+    let ignore = false;
+
     async function load() {
       setLoading(true);
-      // Currently just loads all products — students should use filterProducts()
-      const { data, totalPages, total } = await filterProducts({
-        search,
-        category: selectedCategory,
-        sortBy,
-        sortOrder,
-        page: currentPage,
-        limit: productsPerPage,
-      });
+      try {
+        const res = await filterProducts({
+          search,
+          category: selectedCategory,
+          sortBy,
+          sortOrder,
+          page: currentPage,
+          limit: PRODUCTS_PER_PAGE,
+        });
 
-      setProducts(data);
-      setTotal(total);
-      setTotalPages(totalPages);
-      // Simulate a short loading time so the spinner is visible
-      setTimeout(() => setLoading(false), 600);
+        if (ignore) return; 
+
+        setProducts(res.data);
+        setTotal(res.total);
+        setTotalPages(res.totalPages);
+
+        if (res.totalPages > 0 && currentPage > res.totalPages) {
+          updateParams({ page: res.totalPages }, { replace: true });
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
     }
+
     load();
-  }, [
-    search,
-    selectedCategory,
-    sortBy,
-    sortOrder,
-    currentPage,
-    productsPerPage,
-  ]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [search, selectedCategory, sortBy, sortOrder, currentPage]);
+
+  function handleSearch(e) {
+    updateParams({ search: e.target.value, page: 1 }, { replace: true });
+  }
+
+  function handleCategoryChange(e) {
+    updateParams({ category: e.target.value, page: 1 });
+  }
+
+  function handleSortChange(e) {
+    const [by, order] = e.target.value.split("-");
+    updateParams({ sortBy: by, sortOrder: order, page: 1 });
+  }
+
+  function goToPage(page) {
+    updateParams({ page });
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -86,10 +142,7 @@ export default function ProductsPage() {
               type="text"
               placeholder="Search products..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={handleSearch}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
@@ -97,10 +150,7 @@ export default function ProductsPage() {
           {/* Category Filter */}
           <select
             value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={handleCategoryChange}
             className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="">All Categories</option>
@@ -111,15 +161,9 @@ export default function ProductsPage() {
             ))}
           </select>
 
-          {/* Sort */}
           <select
             value={`${sortBy}-${sortOrder}`}
-            onChange={(e) => {
-              const [by, order] = e.target.value.split("-");
-              setSortBy(by);
-              setSortOrder(order);
-              setCurrentPage(1);
-            }}
+            onChange={handleSortChange}
             className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="title-asc">Name: A → Z</option>
@@ -146,7 +190,6 @@ export default function ProductsPage() {
             ))}
           </div>
 
-          {/* Empty State */}
           {products.length === 0 && (
             <div className="text-center py-16">
               <svg
@@ -166,11 +209,10 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => goToPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
@@ -180,7 +222,7 @@ export default function ProductsPage() {
                 (pageNum) => (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    onClick={() => goToPage(pageNum)}
                     className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                       currentPage === pageNum
                         ? "bg-primary-600 text-white"
@@ -192,9 +234,7 @@ export default function ProductsPage() {
                 )
               )}
               <button
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
+                onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
                 className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
