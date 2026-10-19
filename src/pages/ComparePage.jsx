@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { getProducts } from "../features/products/services/productService";
+import useCompareStore from "../features/products/hooks/useCompareStore";
 
 export default function ComparePage() {
   const [products, setProducts] = useState([]);
-  const [selectedProductA, setSelectedProductA] = useState("");
-  const [selectedProductB, setSelectedProductB] = useState("");
+  const selectedProductA = useCompareStore((s) => s.selectedProductA);
+  const selectedProductB = useCompareStore((s) => s.selectedProductB);
+  const setProductA = useCompareStore((s) => s.setProductA);
+  const setProductB = useCompareStore((s) => s.setProductB);
 
   useEffect(() => {
     async function load() {
@@ -13,10 +16,6 @@ export default function ComparePage() {
     }
     load();
   }, []);
-
-  // Comparison logic not implemented — student task
-  const productA = products.find((p) => p.id === Number(selectedProductA));
-  const productB = products.find((p) => p.id === Number(selectedProductB));
 
   const comparisonFields = [
     { label: "Price", key: "price", format: (v) => `$${v?.toFixed(2) || "—"}` },
@@ -52,8 +51,15 @@ export default function ComparePage() {
             Product A
           </label>
           <select
-            value={selectedProductA}
-            onChange={(e) => setSelectedProductA(e.target.value)}
+            value={selectedProductA?.id || ""}
+            onChange={(e) => {
+              const foundProduct = products.find(
+                (p) => p.id === Number(e.target.value)
+              );
+              if (foundProduct) {
+                setProductA(foundProduct);
+              }
+            }}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="">Select a product...</option>
@@ -69,8 +75,15 @@ export default function ComparePage() {
             Product B
           </label>
           <select
-            value={selectedProductB}
-            onChange={(e) => setSelectedProductB(e.target.value)}
+            value={selectedProductB?.id || ""}
+            onChange={(e) => {
+              const foundProduct = products.find(
+                (p) => p.id === Number(e.target.value)
+              );
+              if (foundProduct) {
+                setProductB(foundProduct);
+              }
+            }}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="">Select a product...</option>
@@ -82,14 +95,15 @@ export default function ComparePage() {
           </select>
         </div>
       </div>
-      {productA === productB && productA !== undefined ? (
+      {selectedProductA === selectedProductB &&
+      selectedProductA !== undefined ? (
         <p className="text-gray-500 mt-1 text-center">
           Cannont compare the product with itself, Please choose a different
           product.
         </p>
-      ) : productA || productB ? (
+      ) : selectedProductA || selectedProductB ? (
         <>
-          {productA?.category !== productB?.category && (
+          {selectedProductA?.category !== selectedProductB?.category && (
             <p className="italic text-yellow-700">
               Note: You're comparing between two prodcuts from different
               categories!
@@ -103,15 +117,15 @@ export default function ComparePage() {
                 Feature
               </div>
               <div className="p-4 text-center border-l border-gray-100">
-                {productA ? (
+                {selectedProductA ? (
                   <div>
                     <img
-                      src={productA.thumbnail}
-                      alt={productA.title}
+                      src={selectedProductA.thumbnail}
+                      alt={selectedProductA.title}
                       className="w-20 h-20 object-cover rounded-xl mx-auto mb-2"
                     />
                     <p className="text-sm font-semibold text-gray-800 line-clamp-2">
-                      {productA.title}
+                      {selectedProductA.title}
                     </p>
                   </div>
                 ) : (
@@ -119,15 +133,15 @@ export default function ComparePage() {
                 )}
               </div>
               <div className="p-4 text-center border-l border-gray-100">
-                {productB ? (
+                {selectedProductB ? (
                   <div>
                     <img
-                      src={productB.thumbnail}
-                      alt={productB.title}
+                      src={selectedProductB.thumbnail}
+                      alt={selectedProductB.title}
                       className="w-20 h-20 object-cover rounded-xl mx-auto mb-2"
                     />
                     <p className="text-sm font-semibold text-gray-800 line-clamp-2">
-                      {productB.title}
+                      {selectedProductB.title}
                     </p>
                   </div>
                 ) : (
@@ -148,40 +162,56 @@ export default function ComparePage() {
                 <div
                   className={`p-4 text-center text-sm  border-l border-gray-100 ${
                     field.label === "Price"
-                      ? productA?.price === productB?.price
+                      ? selectedProductA?.price === selectedProductB?.price
                         ? "text-gray-700"
-                        : comparePrice(productA?.price, productB?.price)
+                        : comparePrice(
+                            selectedProductA?.price,
+                            selectedProductB?.price
+                          )
                         ? "text-green-700"
                         : "text-red-700"
                       : field.label === "Rating"
-                      ? productA?.rating === productB?.rating
+                      ? selectedProductA?.rating === selectedProductB?.rating
                         ? "text-gray-700"
-                        : compareRating(productA?.rating, productB?.rating)
+                        : compareRating(
+                            selectedProductA?.rating,
+                            selectedProductB?.rating
+                          )
                         ? "text-green-700"
                         : "text-red-700"
                       : "text-gray-700"
                   }`}
                 >
-                  {productA ? field.format(productA[field.key]) : "—"}
+                  {selectedProductA
+                    ? field.format(selectedProductA[field.key])
+                    : "—"}
                 </div>
                 <div
                   className={`p-4 text-center text-sm  border-l border-gray-100 ${
                     field.label === "Price"
-                      ? productA?.price === productB?.price
+                      ? selectedProductA?.price === selectedProductB?.price
                         ? "text-gray-700"
-                        : comparePrice(productB?.price, productA?.price)
+                        : comparePrice(
+                            selectedProductB?.price,
+                            selectedProductA?.price
+                          )
                         ? "text-green-700"
                         : "text-red-700"
                       : field.label === "Rating"
-                      ? productA?.rating === productB?.rating
+                      ? selectedProductA?.rating === selectedProductB?.rating
                         ? "text-gray-700"
-                        : compareRating(productB?.rating, productA?.rating)
+                        : compareRating(
+                            selectedProductB?.rating,
+                            selectedProductA?.rating
+                          )
                         ? "text-green-700"
                         : "text-red-700"
                       : "text-gray-700"
                   }`}
                 >
-                  {productB ? field.format(productB[field.key]) : "—"}
+                  {selectedProductB
+                    ? field.format(selectedProductB[field.key])
+                    : "—"}
                 </div>
               </div>
             ))}
@@ -192,10 +222,10 @@ export default function ComparePage() {
                 Description
               </div>
               <div className="p-4 text-sm text-gray-600 border-l border-gray-100 leading-relaxed">
-                {productA?.description || "—"}
+                {selectedProductA?.description || "—"}
               </div>
               <div className="p-4 text-sm text-gray-600 border-l border-gray-100 leading-relaxed">
-                {productB?.description || "—"}
+                {selectedProductB?.description || "—"}
               </div>
             </div>
           </div>
