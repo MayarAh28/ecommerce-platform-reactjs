@@ -163,7 +163,7 @@ const products = [
         id: 17,
         title: "USB-C Hub Multi-Port Adapter",
         description: "7-in-1 USB-C hub with HDMI 4K output, 3 USB 3.0 ports, SD/microSD card reader, and 100W power delivery pass-through. Compact aluminum design.",
-        price: 44.99,
+        price: 119.99,
         category: "Accessories",
         rating: 4.2,
         stock: 53,
